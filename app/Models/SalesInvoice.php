@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SalesInvoice extends Model
@@ -11,6 +12,7 @@ class SalesInvoice extends Model
     use HasFactory;
 
     protected $fillable = [
+        'student_id',
         'invoice_number',
         'customer_name',
         'customer_contact',
@@ -35,5 +37,10 @@ class SalesInvoice extends Model
     public function items(): HasMany
     {
         return $this->hasMany(SalesInvoiceItem::class);
+    }
+
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
     }
 }

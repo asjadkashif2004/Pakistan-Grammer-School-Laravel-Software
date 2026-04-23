@@ -5,7 +5,10 @@
 
 @section('header_actions')
     <div class="header-actions-slot">
-        <a href="{{ route('invoices.index') }}" class="action-chip primary" title="New invoice" aria-label="New invoice">🧾 <span class="header-action-text">Invoice</span></a>
+        <a href="{{ route('invoices.index') }}" class="action-chip primary" title="New invoice" aria-label="New invoice">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3h10a2 2 0 0 1 2 2v14l-3-2-2 2-2-2-2 2-3-2V5a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="header-action-text">Invoice</span>
+        </a>
     </div>
 @endsection
 

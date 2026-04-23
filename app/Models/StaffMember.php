@@ -19,6 +19,7 @@ class StaffMember extends Model
         'role',
         'designation',
         'monthly_wage',
+        'overtime_rate',
         'joining_date',
         'payment_method',
         'bank_name',
@@ -38,6 +39,7 @@ class StaffMember extends Model
             'hired_at' => 'date',
             'joining_date' => 'date',
             'monthly_wage' => 'decimal:2',
+            'overtime_rate' => 'decimal:2',
             'is_active' => 'boolean',
         ];
     }

@@ -15,7 +15,13 @@ class PayrollTransaction extends Model
         'transaction_type',
         'status',
         'amount',
+        'base_salary',
+        'total_advance',
+        'total_overtime',
+        'absence_deduction',
+        'absent_days',
         'hours',
+        'overtime_rate',
         'transaction_month',
         'payment_method',
         'bank_name',
@@ -31,7 +37,13 @@ class PayrollTransaction extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'base_salary' => 'decimal:2',
+            'total_advance' => 'decimal:2',
+            'total_overtime' => 'decimal:2',
+            'absence_deduction' => 'decimal:2',
+            'absent_days' => 'decimal:2',
             'hours' => 'decimal:2',
+            'overtime_rate' => 'decimal:2',
             'transaction_month' => 'date',
             'paid_at' => 'datetime',
         ];

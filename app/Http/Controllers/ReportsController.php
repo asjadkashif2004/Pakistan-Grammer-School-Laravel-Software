@@ -56,7 +56,7 @@ class ReportsController extends Controller
             ->groupBy('ym')
             ->orderBy('ym')
             ->get();
-        $recentInvoices = (clone $invoiceBase)->latest('invoice_date')->limit(10)->get();
+        $recentInvoices = (clone $invoiceBase)->with('student')->latest('invoice_date')->limit(10)->get();
 
         $feePaidBase = FeeCollection::query()
             ->with('student')
@@ -88,7 +88,8 @@ class ReportsController extends Controller
             ->limit(10)
             ->get();
         $pendingFeeAmount = (float) FeeCollection::query()
-            ->whereIn('status', ['Pending', 'Overdue'])
+            ->whereNull('rolled_into_fee_collection_id')
+            ->whereIn('status', ['Unpaid', 'Partial', 'Overdue'])
             ->whereBetween('billing_month', [$fromDate, $toDate])
             ->sum('amount');
 
@@ -232,7 +233,7 @@ class ReportsController extends Controller
             'reports' => [
                 'invoices' => [
                     'title' => 'Monthly Invoice Report',
-                    'icon' => '🧾',
+                    'icon' => 'invoice',
                     'total' => $invoiceTotal,
                     'count' => $invoiceCount,
                     'monthly' => $monthlyInvoices,
@@ -240,7 +241,7 @@ class ReportsController extends Controller
                 ],
                 'fees' => [
                     'title' => 'Monthly Fee Collection Report',
-                    'icon' => '🎓',
+                    'icon' => 'fees',
                     'total' => $feeTotal,
                     'count' => $feeCount,
                     'pending_amount' => $pendingFeeAmount,
@@ -249,7 +250,7 @@ class ReportsController extends Controller
                 ],
                 'admissions' => [
                     'title' => 'Admission Report',
-                    'icon' => '🧑‍🎓',
+                    'icon' => 'admissions',
                     'count' => $admissionsCount,
                     'admission_income' => $admissionIncome,
                     'classes' => $admissionsByClass,
@@ -257,7 +258,7 @@ class ReportsController extends Controller
                 ],
                 'salaries' => [
                     'title' => 'Salaries Report',
-                    'icon' => '👨‍🏫',
+                    'icon' => 'salaries',
                     'total_paid' => $salaryTotal,
                     'pending_count' => $pendingWagesCount,
                     'pending_amount' => $pendingWagesAmount,
@@ -266,7 +267,7 @@ class ReportsController extends Controller
                 ],
                 'expenses' => [
                     'title' => 'Expense Report',
-                    'icon' => '📉',
+                    'icon' => 'expenses',
                     'total' => $expenseTotal,
                     'count' => $expenseCount,
                     'categories' => $expensesByCategory,
@@ -274,7 +275,7 @@ class ReportsController extends Controller
                 ],
                 'income' => [
                     'title' => 'Total Income Report',
-                    'icon' => '💰',
+                    'icon' => 'income',
                     'invoice_income' => $invoiceTotal,
                     'fee_income' => $feeTotal,
                     'other_income' => $otherIncome,
@@ -283,7 +284,7 @@ class ReportsController extends Controller
                 ],
                 'profit-loss' => [
                     'title' => 'Profit & Loss Report',
-                    'icon' => '📊',
+                    'icon' => 'profit-loss',
                     'total_income' => $totalIncome,
                     'salary_expense' => $salaryTotal,
                     'other_expense' => $expenseTotal,

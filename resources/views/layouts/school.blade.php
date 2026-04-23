@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Pakistan Grammar School')</title>
-    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4INo84NyYsKwGYOhW1pZL-6hH4r76HLaBcA&s">
-    <link rel="apple-touch-icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4INo84NyYsKwGYOhW1pZL-6hH4r76HLaBcA&s">
+    <link rel="icon" type="image/png" href="{{ asset('images/logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/logo.png') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -44,36 +44,57 @@
             color: var(--ink);
             text-rendering: optimizeLegibility;
             -webkit-font-smoothing: antialiased;
+            overflow: hidden;
         }
 
         .app-shell {
             min-height: 100vh;
-            display: grid;
-            grid-template-columns: 260px 1fr;
+            display: block;
         }
 
         .sidebar {
             background: linear-gradient(180deg, var(--sidebar-bg), var(--sidebar-dark));
             color: #e8fff0;
-            padding: 18px 14px;
+            padding: 14px 12px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            position: relative;
-            z-index: 25;
+            gap: 10px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 260px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            z-index: 30;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(197, 245, 211, 0.45) transparent;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(197, 245, 211, 0.45);
+            border-radius: 999px;
         }
 
         .brand {
             border: 1px solid rgba(255, 255, 255, 0.16);
             border-radius: 12px;
-            padding: 10px;
+            padding: 8px;
             background: rgba(255, 255, 255, 0.05);
             text-align: center;
         }
 
         .brand img {
-            width: 44px;
-            height: 44px;
+            width: 38px;
+            height: 38px;
             object-fit: contain;
             border-radius: 8px;
             background: #ffffff;
@@ -131,7 +152,7 @@
 
         .brand h1 {
             margin: 0;
-            font-size: 17px;
+            font-size: 15px;
             line-height: 1.25;
             font-weight: 700;
         }
@@ -139,21 +160,21 @@
         .brand p {
             margin: 2px 0 0;
             color: #c5f5d3;
-            font-size: 11px;
+            font-size: 10px;
             letter-spacing: 1px;
             text-transform: uppercase;
         }
 
         .menu-group {
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         .menu-title {
-            font-size: 11px;
+            font-size: 10px;
             letter-spacing: 1px;
             text-transform: uppercase;
             color: #b5ebc6;
-            margin: 8px 8px;
+            margin: 6px 8px 4px;
             font-weight: 700;
         }
 
@@ -162,13 +183,13 @@
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            margin: 6px 0;
-            padding: 9px 10px;
+            margin: 4px 0;
+            padding: 8px 9px;
             border-radius: 10px;
             text-decoration: none;
             color: #e4ffe8;
             border: 1px solid transparent;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             transition:
                 transform var(--fast) var(--ease),
@@ -192,14 +213,23 @@
         .menu-left {
             display: inline-flex;
             align-items: center;
-            gap: 9px;
+            gap: 8px;
         }
 
-        .menu-dot {
-            width: 9px;
-            height: 9px;
-            border-radius: 50%;
-            background: #95ebb0;
+        .menu-icon {
+            width: 16px;
+            height: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #d8fbe3;
+            flex: 0 0 auto;
+        }
+
+        .menu-icon svg {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
 
         .menu-tag {
@@ -216,6 +246,12 @@
             display: flex;
             flex-direction: column;
             min-width: 0;
+            margin-left: 260px;
+            min-height: 100vh;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: var(--shell-bg);
         }
 
         .topbar {
@@ -410,6 +446,7 @@
         }
 
         .date-chip,
+        .time-chip,
         .action-chip {
             border: 1px solid var(--line);
             border-radius: 10px;
@@ -757,8 +794,12 @@
         }
 
         @media (max-width: 1080px) {
+            body {
+                overflow: auto;
+            }
+
             .app-shell {
-                grid-template-columns: 1fr;
+                min-height: 100vh;
             }
 
             .sidebar {
@@ -770,7 +811,8 @@
                 transform: translateX(-100%);
                 transition: transform var(--normal) var(--ease);
                 box-shadow: 0 18px 35px rgba(0, 0, 0, 0.25);
-                overflow: auto;
+                overflow-y: auto;
+                overflow-x: hidden;
             }
 
             body.sidebar-open .sidebar {
@@ -796,9 +838,26 @@
             .sidebar-toggle {
                 display: inline-flex;
             }
+
+            .content-shell {
+                margin-left: 0;
+                min-height: 100vh;
+                height: auto;
+                overflow: visible;
+            }
         }
 
         @media (max-width: 740px) {
+            .sidebar {
+                width: min(88vw, 320px);
+                padding: 12px 10px;
+                gap: 8px;
+            }
+
+            .brand {
+                padding: 7px;
+            }
+
             .topbar {
                 padding: 12px;
                 align-items: stretch;
@@ -940,7 +999,7 @@
         <aside class="sidebar">
             <div class="brand">
                 <img
-                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4INo84NyYsKwGYOhW1pZL-6hH4r76HLaBcA&s"
+                    src="{{ asset('images/logo.png') }}"
                     alt="Pakistan Grammar School logo"
                     loading="lazy"
                     decoding="async">
@@ -950,7 +1009,7 @@
 
             <div class="sidebar-watermark" aria-hidden="true">
                 <img
-                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4INo84NyYsKwGYOhW1pZL-6hH4r76HLaBcA&s"
+                    src="{{ asset('images/logo.png') }}"
                     alt=""
                     loading="lazy"
                     decoding="async">
@@ -959,41 +1018,121 @@
             <div class="menu-group">
                 <div class="menu-title">Overview</div>
                 <a href="{{ route('dashboard') }}" class="menu-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-                    <span class="menu-left"><span class="menu-dot"></span>Dashboard</span>
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M3 11.5 12 4l9 7.5V20H3v-8.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 20v-5h6v5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        </span>
+                        Dashboard
+                    </span>
                 </a>
             </div>
 
             <div class="menu-group">
                 <div class="menu-title">Academics</div>
-                <a href="{{ route('students.index') }}" class="menu-link {{ request()->routeIs('students.*') ? 'active' : '' }}">
-                    <span class="menu-left"><span class="menu-dot"></span>Student Registration</span>
+                <a href="{{ route('students.index') }}" class="menu-link {{ request()->routeIs('students.index') ? 'active' : '' }}">
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><circle cx="10" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 18a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M18 8v6M15 11h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        </span>
+                        Student Registration
+                    </span>
                     <span class="menu-tag">New</span>
                 </a>
-                <a href="{{ route('fee-vouchers.index') }}" class="menu-link {{ request()->routeIs('fee-vouchers.*') ? 'active' : '' }}">
-                    <span class="menu-left"><span class="menu-dot"></span>Fee Vouchers</span>
+                <a href="{{ route('students.roster') }}" class="menu-link {{ request()->routeIs('students.roster', 'students.show', 'students.edit', 'students.update') ? 'active' : '' }}">
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><circle cx="8" cy="9" r="2.5" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="9" r="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 18c.6-2.6 2.6-4 4.5-4s3.9 1.4 4.5 4M12 18c.5-2.2 2.1-3.4 4-3.4 1.8 0 3.4 1.2 4 3.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        </span>
+                        Student Roster
+                    </span>
+                </a>
+                <a href="{{ route('fee-vouchers.index') }}" class="menu-link {{ request()->routeIs('fee-vouchers.*') && ! request()->routeIs('fee-vouchers.list.*') ? 'active' : '' }}">
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M6 3h9l5 5v13H6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 3v5h5M9 13h8M9 17h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        </span>
+                        Fee Vouchers
+                    </span>
+                </a>
+                <a href="{{ route('fee-management.index') }}" class="menu-link {{ request()->routeIs('fee-management.*') ? 'active' : '' }}">
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V5M4 19h16M8 14v-3M12 14V8M16 14v-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7 4h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        </span>
+                        Fee Management
+                    </span>
+                </a>
+                <a href="{{ route('fee-vouchers.list.pending') }}" class="menu-link {{ request()->routeIs('fee-vouchers.list.pending') ? 'active' : '' }}">
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        Pending vouchers
+                    </span>
+                </a>
+                <a href="{{ route('fee-vouchers.list.paid') }}" class="menu-link {{ request()->routeIs('fee-vouchers.list.paid') ? 'active' : '' }}">
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="m8.5 12 2.3 2.3 4.7-4.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        Paid vouchers
+                    </span>
+                </a>
+                <a href="{{ route('fee-vouchers.list.defaulters') }}" class="menu-link {{ request()->routeIs('fee-vouchers.list.defaulters') ? 'active' : '' }}">
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.3 3.6h3.4L21 17.2H3L10.3 3.6Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        Fee defaulters
+                    </span>
                 </a>
             </div>
 
             <div class="menu-group">
                 <div class="menu-title">Commerce</div>
                 <a href="{{ route('products.index') }}" class="menu-link {{ request()->routeIs('products.*') ? 'active' : '' }}">
-                    <span class="menu-left"><span class="menu-dot"></span>Products</span>
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5v-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 20v-7" stroke="currentColor" stroke-width="1.8"/></svg>
+                        </span>
+                        Products
+                    </span>
                 </a>
                 <a href="{{ route('invoices.index') }}" class="menu-link {{ request()->routeIs('invoices.*') ? 'active' : '' }}">
-                    <span class="menu-left"><span class="menu-dot"></span>Invoices / Sales</span>
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M3 5h2l2.2 9.2a1 1 0 0 0 1 .8h8.7a1 1 0 0 0 1-.8L20 8H7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="19" r="1.5" fill="currentColor"/><circle cx="17" cy="19" r="1.5" fill="currentColor"/></svg>
+                        </span>
+                        POS / Sales
+                    </span>
                 </a>
             </div>
 
             <div class="menu-group">
                 <div class="menu-title">HR & Finance</div>
                 <a href="{{ route('staff-salaries.index') }}" class="menu-link {{ request()->routeIs('staff-salaries.*') ? 'active' : '' }}">
-                    <span class="menu-left"><span class="menu-dot"></span>Staff Salaries</span>
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 11h18M8 14h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        </span>
+                        Workers & Salaries
+                    </span>
                 </a>
                 <a href="{{ route('expenses.index') }}" class="menu-link {{ request()->routeIs('expenses.*') ? 'active' : '' }}">
-                    <span class="menu-left"><span class="menu-dot"></span>Expenses</span>
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M7 3h10v18H7z" stroke="currentColor" stroke-width="1.8"/><path d="M10 8h4M10 12h4M10 16h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        </span>
+                        Expenses
+                    </span>
                 </a>
                 <a href="{{ route('reports.index') }}" class="menu-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">
-                    <span class="menu-left"><span class="menu-dot"></span>Reports</span>
+                    <span class="menu-left">
+                        <span class="menu-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V5M4 19h16M8 14v-3M12 14V9M16 14V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        </span>
+                        Reports
+                    </span>
                 </a>
             </div>
 
@@ -1013,13 +1152,15 @@
                         </svg>
                         <span class="sidebar-toggle-label">Menu</span>
                     </button>
-                    <img class="mobile-top-logo" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4INo84NyYsKwGYOhW1pZL-6hH4r76HLaBcA&s" alt="Pakistan Grammar School logo">
+                    <img class="mobile-top-logo" src="{{ asset('images/logo.png') }}" alt="Pakistan Grammar School logo">
                     <h2>@yield('page_heading', 'Dashboard Overview')</h2>
                 </div>
                 <div class="topbar-right">
-                    <span class="date-chip">{{ $todayLabel ?? now()->format('l, d F Y') }}</span>
+                    <span class="date-chip" id="currentDateChip">{{ $todayLabel ?? now()->format('l, d F Y') }}</span>
+                    <span class="time-chip" id="currentTimeChip">{{ now()->format('h:i A') }}</span>
                     <div class="alerts-host">
-                        <button id="alertsButton" type="button" class="action-chip alerts-btn" title="Alerts" aria-label="Alerts">🔔
+                        <button id="alertsButton" type="button" class="action-chip alerts-btn" title="Alerts" aria-label="Alerts">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 0 1-6 0m6 0H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             <span id="alertsCount" class="alerts-badge {{ $unreadAlertsCount > 0 ? '' : 'is-hidden' }}">{{ $unreadAlertsCount }}</span>
                         </button>
                         <div id="alertsDropdown" class="alerts-dropdown" role="region" aria-label="Notifications">
@@ -1038,10 +1179,11 @@
                             <a href="{{ route('alerts.index') }}" class="alerts-dropdown-foot">View all alerts</a>
                         </div>
                     </div>
-                    @yield('header_actions')
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="action-chip logout" title="Logout" aria-label="Logout">⎋</button>
+                        <button type="submit" class="action-chip logout" title="Logout" aria-label="Logout">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
                     </form>
                 </div>
             </header>
@@ -1061,6 +1203,16 @@
         </div>
     </div>
     @stack('scripts')
+    @php
+        $openChallanPrintId = session()->pull('open_print_challan');
+    @endphp
+    @if ($openChallanPrintId)
+        <script>
+            (function () {
+                window.open(@json(route('fee-vouchers.print', $openChallanPrintId)), '_blank', 'noopener,noreferrer');
+            })();
+        </script>
+    @endif
     <script>
         (function () {
             const body = document.body;
@@ -1069,10 +1221,35 @@
             const button = document.getElementById('alertsButton');
             const dropdown = document.getElementById('alertsDropdown');
             const countEl = document.getElementById('alertsCount');
+            const dateChip = document.getElementById('currentDateChip');
+            const timeChip = document.getElementById('currentTimeChip');
 
             const closeSidebar = () => body.classList.remove('sidebar-open');
             const openSidebar = () => body.classList.add('sidebar-open');
             const toggleSidebar = () => body.classList.toggle('sidebar-open');
+
+            const syncDateTime = () => {
+                const now = new Date();
+                if (dateChip) {
+                    dateChip.textContent = now.toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                    });
+                }
+                if (timeChip) {
+                    timeChip.textContent = now.toLocaleTimeString(undefined, {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true,
+                    });
+                }
+            };
+
+            syncDateTime();
+            setInterval(syncDateTime, 1000);
 
             sidebarToggle?.addEventListener('click', toggleSidebar);
             sidebarOverlay?.addEventListener('click', closeSidebar);

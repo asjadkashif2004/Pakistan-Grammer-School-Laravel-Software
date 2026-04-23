@@ -5,7 +5,10 @@
 
 @section('header_actions')
     <div class="header-actions-slot">
-        <a href="{{ route('fee-vouchers.index', ['student_id' => $voucher->student_id]) }}" class="action-chip" title="Back to fee vouchers" aria-label="Back to fee vouchers">← <span class="header-action-text">Vouchers</span></a>
+        <a href="{{ route('fee-vouchers.index', ['student_code' => $voucher->student?->student_code]) }}" class="action-chip" title="Back to fee vouchers" aria-label="Back to fee vouchers">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="header-action-text">Vouchers</span>
+        </a>
     </div>
 @endsection
 
@@ -92,14 +95,6 @@
                 <div class="field">
                     <label for="arrears">Arrears</label>
                     <input id="arrears" type="number" step="0.01" min="0" name="arrears" value="{{ old('arrears', (float) $voucher->arrears) }}">
-                </div>
-                <div class="field">
-                    <label for="fine">Fine</label>
-                    <input id="fine" type="number" step="0.01" min="0" name="fine" value="{{ old('fine', (float) $voucher->fine) }}">
-                </div>
-                <div class="field">
-                    <label for="discount">Discount</label>
-                    <input id="discount" type="number" step="0.01" min="0" name="discount" value="{{ old('discount', (float) $voucher->discount) }}">
                 </div>
                 <div class="field">
                     <label for="notes">Notes</label>

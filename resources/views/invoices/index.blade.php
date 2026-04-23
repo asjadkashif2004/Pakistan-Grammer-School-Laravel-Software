@@ -1,46 +1,65 @@
 @extends('layouts.school')
 
-@section('title', 'Invoices / Sales | Pakistan Grammar School')
-@section('page_heading', 'Invoices / Sales')
+@section('title', 'POS / Sales | Pakistan Grammar School')
+@section('page_heading', 'POS / Sales')
 
 @section('header_actions')
     <div class="header-actions-slot">
-        <a href="#invoice-form" class="action-chip primary" title="New Invoice" aria-label="New Invoice">🧾 <span class="header-action-text">New</span></a>
+        <a href="#invoice-form" class="action-chip primary" title="New Invoice" aria-label="New Invoice">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3h10a2 2 0 0 1 2 2v14l-3-2-2 2-2-2-2 2-3-2V5a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="header-action-text">New</span>
+        </a>
     </div>
 @endsection
 
 @push('styles')
     <style>
-        .sales-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr);
-            gap: 12px;
+        .sales-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 640px;
+            margin: 0 auto;
         }
 
         .panel {
             background: #ffffff;
             border: 1px solid #d4ead4;
-            border-radius: 14px;
+            border-radius: 10px;
             overflow: hidden;
         }
 
         .head {
-            padding: 14px 16px;
+            padding: 10px 12px;
             border-bottom: 1px solid #e7f3e7;
-            font-size: 22px;
+            font-size: 16px;
             color: #1f3f24;
             font-weight: 800;
+            letter-spacing: 0.02em;
         }
 
         .body {
-            padding: 14px;
+            padding: 12px;
+        }
+
+        /* ── Form fields layout: 3 columns on desktop ── */
+        .form-meta-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0 14px;
+        }
+
+        .form-bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 0 14px;
         }
 
         .field {
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            margin-bottom: 10px;
+            gap: 4px;
+            margin-bottom: 8px;
         }
 
         .field label {
@@ -64,14 +83,14 @@
 
         .item-row {
             display: grid;
-            grid-template-columns: minmax(130px, 1.1fr) minmax(210px, 1.8fr) minmax(74px, 90px) minmax(110px, 130px) auto;
-            gap: 10px;
-            margin-bottom: 10px;
+            grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.4fr) minmax(64px, 72px) minmax(96px, 110px) auto;
+            gap: 8px;
+            margin-bottom: 8px;
             align-items: center;
-            padding: 10px;
+            padding: 8px;
             border: 1px solid #e6efe6;
-            border-radius: 10px;
-            background: #fbfefb;
+            border-radius: 8px;
+            background: #fafcfa;
         }
 
         #itemsWrapper {
@@ -115,7 +134,8 @@
             border: 0;
             background: linear-gradient(90deg, #0f7a35, #17a34a);
             color: #ffffff;
-            padding: 11px;
+            padding: 10px 12px;
+            font-size: 14px;
         }
 
         .error {
@@ -132,14 +152,14 @@
         .table th,
         .table td {
             text-align: left;
-            padding: 10px 8px;
+            padding: 8px 6px;
             border-top: 1px solid #e8f3e8;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .table th {
             color: #56735a;
-            font-size: 12px;
+            font-size: 11px;
             letter-spacing: 1px;
             text-transform: uppercase;
             font-weight: 700;
@@ -162,13 +182,19 @@
             color: #0f7a35;
         }
 
-        @media (max-width: 1200px) {
-            .sales-grid {
-                grid-template-columns: 1fr;
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .form-meta-row {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
-        @media (max-width: 800px) {
+        @media (max-width: 600px) {
+            .form-meta-row,
+            .form-bottom-row {
+                grid-template-columns: 1fr;
+            }
+
             .item-row {
                 grid-template-columns: 1fr;
                 gap: 8px;
@@ -185,28 +211,38 @@
 @endpush
 
 @section('content')
-    <div class="sales-grid">
+    <div class="sales-stack">
+
+        {{-- ═══════════════════════════════════════
+             PANEL 1 — CREATE INVOICE FORM (TOP)
+        ════════════════════════════════════════ --}}
         <section class="panel" id="invoice-form">
-            <header class="head">Create Sales Invoice</header>
+            <header class="head">New sale (POS)</header>
             <div class="body">
                 <form method="POST" action="{{ route('invoices.store') }}" id="invoiceForm">
                     @csrf
-                    <div class="field">
-                        <label for="customer_name">Customer Name</label>
-                        <input id="customer_name" type="text" name="customer_name" value="{{ old('customer_name') }}" required>
-                        @error('customer_name') <span class="error">{{ $message }}</span> @enderror
-                    </div>
-                    <div class="field">
-                        <label for="customer_contact">Customer Contact</label>
-                        <input id="customer_contact" type="text" name="customer_contact" value="{{ old('customer_contact') }}" placeholder="03XX-XXXXXXX" pattern="03\d{2}-\d{7}">
-                        @error('customer_contact') <span class="error">{{ $message }}</span> @enderror
-                    </div>
-                    <div class="field">
-                        <label for="invoice_date">Invoice Date</label>
-                        <input id="invoice_date" type="date" name="invoice_date" value="{{ old('invoice_date', now()->toDateString()) }}" required>
-                        @error('invoice_date') <span class="error">{{ $message }}</span> @enderror
+
+                    {{-- Student ID (lookup) | Student details | Invoice Date --}}
+                    <div class="form-meta-row">
+                        <div class="field">
+                            <label for="student_code_lookup">Student ID</label>
+                            <input id="student_code_lookup" type="text" value="{{ old('student_code_lookup') }}" placeholder="e.g. PGS-00025" autocomplete="off" pattern="PGS-[0-9]{5}">
+                            <input type="hidden" id="student_id" name="student_id" value="{{ old('student_id') }}">
+                            <div id="studentLookupStatus" class="lookup-status" style="margin-top:4px;">Enter Student ID to load student.</div>
+                            @error('student_id') <span class="error">{{ $message }}</span> @enderror
+                        </div>
+                        <div class="field">
+                            <label for="student_details_display">Student name</label>
+                            <input id="student_details_display" type="text" readonly placeholder="Auto-filled from Student ID">
+                        </div>
+                        <div class="field">
+                            <label for="invoice_date">Invoice Date</label>
+                            <input id="invoice_date" type="date" name="invoice_date" value="{{ old('invoice_date', now()->toDateString()) }}" required>
+                            @error('invoice_date') <span class="error">{{ $message }}</span> @enderror
+                        </div>
                     </div>
 
+                    {{-- Invoice Items (full width) --}}
                     <div class="field">
                         <label>Invoice Items</label>
                         <div id="itemsWrapper">
@@ -224,30 +260,36 @@
                         @error('items') <span class="error">{{ $message }}</span> @enderror
                     </div>
 
-                    <div class="field">
-                        <label for="discount">Discount</label>
-                        <input id="discount" type="number" step="0.01" min="0" name="discount" value="{{ old('discount', 0) }}">
-                        @error('discount') <span class="error">{{ $message }}</span> @enderror
-                    </div>
-                    <div class="field">
-                        <label for="notes">Notes</label>
-                        <textarea id="notes" name="notes" rows="2">{{ old('notes') }}</textarea>
-                        @error('notes') <span class="error">{{ $message }}</span> @enderror
+                    {{-- Discount (narrow) | Notes (wide) --}}
+                    <div class="form-bottom-row">
+                        <div class="field">
+                            <label for="discount">Discount</label>
+                            <input id="discount" type="number" step="0.01" min="0" name="discount" value="{{ old('discount', 0) }}">
+                            @error('discount') <span class="error">{{ $message }}</span> @enderror
+                        </div>
+                        <div class="field">
+                            <label for="notes">Notes</label>
+                            <textarea id="notes" name="notes" rows="2">{{ old('notes') }}</textarea>
+                            @error('notes') <span class="error">{{ $message }}</span> @enderror
+                        </div>
                     </div>
 
-                    <button class="btn primary" type="submit">Create Invoice & Deduct Stock</button>
+                    <button class="btn primary" type="submit">Save sale &amp; deduct stock</button>
                 </form>
             </div>
         </section>
 
+        {{-- ═══════════════════════════════════════
+             PANEL 2 — SALES INVOICES TABLE (BOTTOM)
+        ════════════════════════════════════════ --}}
         <section class="panel">
-            <header class="head">Sales Invoices</header>
+            <header class="head">Receipt history</header>
             <div class="body">
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Invoice #</th>
-                            <th>Customer</th>
+                            <th>Student</th>
                             <th>Date</th>
                             <th>Total</th>
                             <th>Status</th>
@@ -258,14 +300,25 @@
                         @forelse ($invoices as $invoice)
                             <tr>
                                 <td>{{ $invoice->invoice_number }}</td>
-                                <td>{{ $invoice->customer_name }}</td>
+                                <td>
+                                    @if ($invoice->student)
+                                        <strong>{{ $invoice->student->student_code }}</strong>
+                                        <div style="font-size:12px;color:#5f7661;">{{ $invoice->student->full_name }}</div>
+                                    @else
+                                        {{ $invoice->customer_name ?: '—' }}
+                                    @endif
+                                </td>
                                 <td>{{ optional($invoice->invoice_date)->format('d M Y') }}</td>
                                 <td>Rs {{ number_format((float) $invoice->total_amount, 0) }}</td>
                                 <td><span class="status">{{ $invoice->status }}</span></td>
                                 <td>
                                     <div class="actions">
-                                        <a href="{{ route('invoices.print', $invoice) }}" target="_blank" class="btn action-icon" title="Print">🖨️</a>
-                                        <a href="{{ route('invoices.download', $invoice) }}" class="btn action-icon" title="Download">⬇️</a>
+                                        <a href="{{ route('invoices.print', $invoice) }}" target="_blank" class="btn action-icon" title="Print">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8V4h10v4M7 17H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        </a>
+                                        <a href="{{ route('invoices.download', $invoice) }}" class="btn action-icon" title="Download">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0l4-4m-4 4l-4-4M4 20h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        </a>
                                     </div>
                                 </td>
                             </tr>
@@ -277,12 +330,75 @@
                 <div class="list-pagination">{{ $invoices->links() }}</div>
             </div>
         </section>
+
     </div>
 @endsection
 
 @push('scripts')
     <script>
         (function () {
+            const studentCodeInput = document.getElementById('student_code_lookup');
+            const studentIdInput = document.getElementById('student_id');
+            const studentDetails = document.getElementById('student_details_display');
+            const studentStatus = document.getElementById('studentLookupStatus');
+
+            const clearStudent = (message, isError) => {
+                if (studentIdInput) studentIdInput.value = '';
+                if (studentDetails) studentDetails.value = '';
+                if (studentStatus) {
+                    studentStatus.textContent = message;
+                    studentStatus.classList.toggle('error', !!isError);
+                }
+            };
+
+            const lookupStudent = async () => {
+                if (!studentCodeInput || !studentIdInput || !studentStatus) return;
+                const code = studentCodeInput.value.trim().toUpperCase();
+                if (!code) {
+                    clearStudent('Enter Student ID to load student.', false);
+                    return;
+                }
+                studentStatus.textContent = 'Looking up student...';
+                studentStatus.classList.remove('error');
+                try {
+                    const url = new URL('{{ route('invoices.student-lookup') }}', window.location.origin);
+                    url.searchParams.set('student_code', code);
+                    const res = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    const data = await res.json();
+                    if (!res.ok || !data.found) {
+                        clearStudent(data.message || 'Student not found.', true);
+                        return;
+                    }
+                    studentIdInput.value = data.id;
+                    if (studentDetails) {
+                        studentDetails.value = `${data.full_name} — ${data.class_name} ${data.section} — Father: ${data.father_name || '-'}`;
+                    }
+                    studentStatus.textContent = 'Student loaded.';
+                    studentStatus.classList.remove('error');
+                } catch (_) {
+                    clearStudent('Unable to look up student right now.', true);
+                }
+            };
+
+            studentCodeInput?.addEventListener('change', lookupStudent);
+            studentCodeInput?.addEventListener('blur', lookupStudent);
+            let studentLookupTimer = null;
+            studentCodeInput?.addEventListener('input', () => {
+                if (studentLookupTimer) clearTimeout(studentLookupTimer);
+                studentLookupTimer = setTimeout(lookupStudent, 450);
+            });
+
+            const invoiceForm = document.getElementById('invoiceForm');
+            invoiceForm?.addEventListener('submit', async function (e) {
+                if (!studentIdInput?.value && studentCodeInput?.value.trim()) {
+                    e.preventDefault();
+                    await lookupStudent();
+                    if (studentIdInput?.value) {
+                        invoiceForm.submit();
+                    }
+                }
+            });
+
             const wrapper = document.getElementById('itemsWrapper');
             const addButton = document.getElementById('addItemRow');
             if (!wrapper || !addButton) return;

@@ -25,7 +25,10 @@ class DashboardController extends Controller
             ->whereMonth('billing_month', $now->month)
             ->sum('amount');
 
-        $pendingFees = FeeCollection::whereIn('status', ['Pending', 'Overdue'])->count();
+        $pendingFees = FeeCollection::query()
+            ->whereNull('rolled_into_fee_collection_id')
+            ->whereIn('status', ['Unpaid', 'Partial', 'Overdue'])
+            ->count();
 
         $fromDate = $now->copy()->subMonths(9)->startOfMonth();
         $toDate = $now->copy()->endOfMonth();

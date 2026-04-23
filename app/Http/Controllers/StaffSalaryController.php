@@ -2,15 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\PayPayrollRecordRequest;
-use App\Http\Requests\StorePayrollRecordRequest;
-use App\Http\Requests\StoreStaffMemberRequest;
-use App\Http\Requests\UpdatePayrollRecordRequest;
-use App\Http\Requests\UpdateStaffMemberRequest;
 use App\Models\PayrollTransaction;
 use App\Models\StaffMember;
 use App\Support\ActivityLogger;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -22,138 +16,136 @@ class StaffSalaryController extends Controller
     public function index(Request $request): View
     {
         $month = (string) $request->query('month', now()->format('Y-m'));
-        $monthStart = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-        $dateFrom = $request->query('date_from');
-        $dateTo = $request->query('date_to');
+        $monthStart = $this->parseMonthStart($month);
         $search = trim((string) $request->query('q', ''));
-        $statusFilter = $request->query('status');
 
-        $staff = StaffMember::query()
-            ->withSum(['payrollTransactions as advances_month' => function ($query) use ($monthStart) {
-                $query->where('transaction_type', 'advance')
-                    ->whereDate('transaction_month', $monthStart);
-            }], 'amount')
-            ->withSum(['payrollTransactions as wages_paid_month' => function ($query) use ($monthStart) {
-                $query->where('transaction_type', 'wage')
-                    ->whereDate('transaction_month', $monthStart)
-                    ->where('status', 'Paid');
-            }], 'amount')
+        $workers = StaffMember::query()
             ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($subQuery) use ($search) {
-                    $subQuery->where('name', 'like', "%{$search}%")
+                $query->where(function ($sub) use ($search) {
+                    $sub->where('name', 'like', "%{$search}%")
                         ->orWhere('employee_code', 'like', "%{$search}%")
-                        ->orWhere('cnic', 'like', "%{$search}%")
-                        ->orWhere('contact_number', 'like', "%{$search}%");
+                        ->orWhere('contact_number', 'like', "%{$search}%")
+                        ->orWhere('role', 'like', "%{$search}%");
                 });
             })
+            ->orderByDesc('is_active')
             ->orderBy('name')
-            ->paginate(10, ['*'], 'staff_page')
+            ->paginate(15)
             ->withQueryString();
 
-        $payrollBase = PayrollTransaction::query()
-            ->with('staffMember')
-            ->where('transaction_type', 'wage')
-            ->whereDate('transaction_month', $monthStart)
-            ->when($dateFrom, fn ($query) => $query->whereDate('transaction_month', '>=', $dateFrom))
-            ->when($dateTo, fn ($query) => $query->whereDate('transaction_month', '<=', $dateTo))
-            ->when($search !== '', function ($query) use ($search) {
-                $query->whereHas('staffMember', function ($staffQuery) use ($search) {
-                    $staffQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('employee_code', 'like', "%{$search}%")
-                        ->orWhere('cnic', 'like', "%{$search}%")
-                        ->orWhere('contact_number', 'like', "%{$search}%");
-                });
-            });
+        $workerIds = $workers->getCollection()->pluck('id');
+        $monthTransactions = PayrollTransaction::query()
+            ->whereIn('staff_member_id', $workerIds)
+            ->whereDate('transaction_month', $monthStart->toDateString())
+            ->orderBy('paid_at')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('staff_member_id');
 
-        $unpaidRecords = (clone $payrollBase)
-            ->when($statusFilter && $statusFilter !== 'Unpaid', fn ($query) => $query->whereRaw('1=0'))
-            ->where('status', 'Unpaid')
-            ->latest('created_at')
-            ->paginate(10, ['*'], 'unpaid_page')
-            ->withQueryString();
+        $workers->getCollection()->transform(function (StaffMember $worker) use ($monthTransactions) {
+            $rows = $monthTransactions->get($worker->id, collect());
+            $advances = $rows->where('transaction_type', 'advance')->values();
+            $overtime = $rows->where('transaction_type', 'extra_hours')->values();
+            $wage = $rows->where('transaction_type', 'wage')->sortByDesc('id')->first();
 
-        $paidRecords = (clone $payrollBase)
-            ->when($statusFilter && $statusFilter !== 'Paid', fn ($query) => $query->whereRaw('1=0'))
-            ->where('status', 'Paid')
-            ->latest('paid_at')
-            ->paginate(10, ['*'], 'paid_page')
-            ->withQueryString();
+            $baseSalary = round((float) $worker->monthly_wage, 2);
+            $advanceTotal = round((float) $advances->sum('amount'), 2);
+            $overtimeTotal = round((float) $overtime->sum('amount'), 2);
+            $dailySalary = round($baseSalary / 30, 4);
 
-        $activeWorkers = StaffMember::where('is_active', true)->count();
-        $monthlyWageBill = StaffMember::where('is_active', true)->sum('monthly_wage');
-        $advancesMonth = (float) PayrollTransaction::query()
-            ->where('transaction_type', 'advance')
-            ->whereDate('transaction_month', $monthStart)
-            ->sum('amount');
-        $wagesPaid = (float) PayrollTransaction::query()
-            ->where('transaction_type', 'wage')
-            ->whereDate('transaction_month', $monthStart)
-            ->where('status', 'Paid')
-            ->sum('amount');
+            $absentDays = (float) ($wage?->absent_days ?? 0);
+            $absenceDeduction = $wage && $wage->absence_deduction !== null
+                ? round((float) $wage->absence_deduction, 2)
+                : round($absentDays * $dailySalary, 2);
 
-        $staffOptions = StaffMember::where('is_active', true)->orderBy('name')->get();
+            $finalPayable = $wage && $wage->status === 'Paid'
+                ? round((float) $wage->amount, 2)
+                : round(max(0, $baseSalary + $overtimeTotal - $absenceDeduction - $advanceTotal), 2);
+
+            $worker->setAttribute('month_advances', $advances);
+            $worker->setAttribute('month_overtime', $overtime);
+            $worker->setAttribute('month_wage', $wage);
+            $worker->setAttribute('advance_total', $advanceTotal);
+            $worker->setAttribute('overtime_total', $overtimeTotal);
+            $worker->setAttribute('absence_deduction', $absenceDeduction);
+            $worker->setAttribute('absent_days', $absentDays);
+            $worker->setAttribute('base_salary', $baseSalary);
+            $worker->setAttribute('daily_salary', $dailySalary);
+            $worker->setAttribute('final_payable', $finalPayable);
+            $worker->setAttribute('is_locked', (bool) ($wage && $wage->status === 'Paid'));
+            $worker->setAttribute('remaining_advance_limit', round(max(0, $baseSalary - $advanceTotal), 2));
+
+            return $worker;
+        });
+
+        $summary = [
+            'active_workers' => (int) StaffMember::query()->where('is_active', true)->count(),
+            'monthly_wage_bill' => (float) StaffMember::query()->where('is_active', true)->sum('monthly_wage'),
+            'advances_month' => (float) PayrollTransaction::query()
+                ->where('transaction_type', 'advance')
+                ->whereDate('transaction_month', $monthStart->toDateString())
+                ->sum('amount'),
+            'wages_paid' => (float) PayrollTransaction::query()
+                ->where('transaction_type', 'wage')
+                ->where('status', 'Paid')
+                ->whereDate('transaction_month', $monthStart->toDateString())
+                ->sum('amount'),
+        ];
 
         return view('staff-salaries.index', [
             'todayLabel' => now()->format('l, d F Y'),
-            'month' => $month,
+            'month' => $monthStart->format('Y-m'),
             'search' => $search,
-            'statusFilter' => $statusFilter,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
-            'staff' => $staff,
-            'staffOptions' => $staffOptions,
-            'unpaidRecords' => $unpaidRecords,
-            'paidRecords' => $paidRecords,
-            'activeWorkers' => $activeWorkers,
-            'monthlyWageBill' => (float) $monthlyWageBill,
-            'advancesMonth' => $advancesMonth,
-            'wagesPaid' => $wagesPaid,
+            'workers' => $workers,
+            'summary' => $summary,
         ]);
     }
 
-    public function storeEmployee(StoreStaffMemberRequest $request): RedirectResponse
+    public function storeEmployee(Request $request): RedirectResponse
     {
-        $validated = $request->validated();
-        $prepared = $this->prepareStaffPaymentDetails($validated);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:140'],
+            'phone' => ['required', 'regex:/^03[0-9]{9}$/'],
+            'role' => ['required', 'string', 'max:100'],
+            'monthly_salary' => ['required', 'numeric', 'min:0'],
+            'overtime_rate' => ['required', 'numeric', 'min:0'],
+            'status' => ['required', 'in:active,inactive'],
+        ]);
+        $phone = $this->normalizePakPhone($validated['phone']);
 
-        $staffMember = DB::transaction(function () use ($prepared) {
+        $worker = DB::transaction(function () use ($validated, $phone) {
             $member = StaffMember::create([
-                'cnic' => $prepared['cnic'],
-                'name' => $prepared['name'],
-                'phone' => $prepared['contact_number'],
-                'contact_number' => $prepared['contact_number'],
-                'role' => null,
-                'designation' => $prepared['designation'] ?? null,
-                'monthly_wage' => $prepared['monthly_wage'],
-                'joining_date' => $prepared['joining_date'],
-                'hired_at' => $prepared['joining_date'],
-                'is_active' => (bool) ($prepared['is_active'] ?? true),
-                'payment_method' => $prepared['payment_method'],
-                'bank_name' => $prepared['bank_name'] ?? null,
-                'branch_code' => $prepared['branch_code'] ?? null,
-                'iban' => $prepared['iban'] ?? null,
-                'account_number' => $prepared['account_number'] ?? null,
-                'online_wallet_type' => $prepared['online_wallet_type'] ?? null,
-                'online_wallet_number' => $prepared['online_wallet_number'] ?? null,
+                'name' => $validated['name'],
+                'phone' => $phone,
+                'contact_number' => $phone,
+                'role' => $validated['role'],
+                'designation' => $validated['role'],
+                'monthly_wage' => $validated['monthly_salary'],
+                'overtime_rate' => $validated['overtime_rate'],
+                'is_active' => $validated['status'] === 'active',
+                'joining_date' => now()->toDateString(),
+                'hired_at' => now()->toDateString(),
+                'payment_method' => 'bank',
+                'cnic' => null,
             ]);
 
             $member->update([
-                'employee_code' => sprintf('EMP-%05d', $member->id),
+                'employee_code' => sprintf('WK-%05d', $member->id),
             ]);
 
             return $member;
         });
 
         ActivityLogger::log(
-            'employee.created',
-            "Employee {$staffMember->name} ({$staffMember->employee_code}) added.",
+            'worker.created',
+            "Worker {$worker->name} ({$worker->employee_code}) created.",
             'staff_member',
-            $staffMember->id
+            $worker->id
         );
 
         return redirect()
-            ->route('staff-salaries.index')
-            ->with('status', "Employee {$staffMember->employee_code} created successfully.");
+            ->route('staff-salaries.index', ['month' => $request->input('month', now()->format('Y-m'))])
+            ->with('status', 'Worker added successfully.');
     }
 
     public function editEmployee(StaffMember $staffMember): View
@@ -164,212 +156,103 @@ class StaffSalaryController extends Controller
         ]);
     }
 
-    public function updateEmployee(UpdateStaffMemberRequest $request, StaffMember $staffMember): RedirectResponse
+    public function updateEmployee(Request $request, StaffMember $staffMember): RedirectResponse
     {
-        $validated = $request->validated();
-        $prepared = $this->prepareStaffPaymentDetails($validated);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:140'],
+            'phone' => ['required', 'regex:/^03[0-9]{9}$/'],
+            'role' => ['required', 'string', 'max:100'],
+            'monthly_salary' => ['required', 'numeric', 'min:0'],
+            'overtime_rate' => ['required', 'numeric', 'min:0'],
+            'status' => ['required', 'in:active,inactive'],
+            'month' => ['nullable', 'date_format:Y-m'],
+        ]);
+        $phone = $this->normalizePakPhone($validated['phone']);
 
         $staffMember->update([
-            'cnic' => $prepared['cnic'],
-            'name' => $prepared['name'],
-            'phone' => $prepared['contact_number'],
-            'contact_number' => $prepared['contact_number'],
-            'role' => null,
-            'designation' => $prepared['designation'] ?? null,
-            'monthly_wage' => $prepared['monthly_wage'],
-            'joining_date' => $prepared['joining_date'],
-            'hired_at' => $prepared['joining_date'],
-            'is_active' => (bool) ($prepared['is_active'] ?? true),
-            'payment_method' => $prepared['payment_method'],
-            'bank_name' => $prepared['bank_name'] ?? null,
-            'branch_code' => $prepared['branch_code'] ?? null,
-            'iban' => $prepared['iban'] ?? null,
-            'account_number' => $prepared['account_number'] ?? null,
-            'online_wallet_type' => $prepared['online_wallet_type'] ?? null,
-            'online_wallet_number' => $prepared['online_wallet_number'] ?? null,
+            'name' => $validated['name'],
+            'phone' => $phone,
+            'contact_number' => $phone,
+            'role' => $validated['role'],
+            'designation' => $validated['role'],
+            'monthly_wage' => $validated['monthly_salary'],
+            'overtime_rate' => $validated['overtime_rate'],
+            'is_active' => $validated['status'] === 'active',
         ]);
 
         ActivityLogger::log(
-            'employee.updated',
-            "Employee {$staffMember->name} ({$staffMember->employee_code}) updated.",
+            'worker.updated',
+            "Worker {$staffMember->name} ({$staffMember->employee_code}) updated.",
             'staff_member',
             $staffMember->id
         );
 
         return redirect()
-            ->route('staff-salaries.index')
-            ->with('status', "Employee {$staffMember->employee_code} updated successfully.");
+            ->route('staff-salaries.index', ['month' => $validated['month'] ?? now()->format('Y-m')])
+            ->with('status', 'Worker updated successfully.');
     }
 
-    public function destroyEmployee(StaffMember $staffMember): RedirectResponse
+    public function destroyEmployee(Request $request, StaffMember $staffMember): RedirectResponse
     {
-        $code = $staffMember->employee_code;
+        if ($staffMember->payrollTransactions()->exists()) {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $request->input('month', now()->format('Y-m'))])
+                ->with('status', 'Cannot delete worker with payroll history. Set status to inactive instead.');
+        }
+
         $name = $staffMember->name;
+        $code = $staffMember->employee_code;
         $staffMember->delete();
 
         ActivityLogger::log(
-            'employee.deleted',
-            "Employee {$name} ({$code}) deleted.",
+            'worker.deleted',
+            "Worker {$name} ({$code}) deleted.",
             'staff_member'
         );
 
         return redirect()
-            ->route('staff-salaries.index')
-            ->with('status', "Employee {$code} deleted.");
-    }
-
-    public function storePayroll(StorePayrollRecordRequest $request): RedirectResponse
-    {
-        $validated = $request->validated();
-        $staffMember = StaffMember::findOrFail((int) $validated['staff_member_id']);
-        $status = 'Unpaid';
-        $paymentDetails = $this->preparePayrollPaymentDetails($validated, false);
-
-        $record = PayrollTransaction::create([
-            'staff_member_id' => $staffMember->id,
-            'transaction_type' => 'wage',
-            'status' => $status,
-            'amount' => (float) $validated['salary_amount'],
-            'hours' => null,
-            'transaction_month' => Carbon::createFromFormat('Y-m', $validated['payroll_month'])->startOfMonth(),
-            ...$paymentDetails,
-            'notes' => $validated['notes'] ?? null,
-            'paid_at' => $status === 'Paid'
-                ? Carbon::parse($validated['payment_date'] ?? now())
-                : null,
-        ]);
-
-        ActivityLogger::log(
-            'payroll.record_created',
-            "Payroll record {$record->id} created for {$staffMember->name} with status {$status}.",
-            'payroll_transaction',
-            $record->id
-        );
-
-        return redirect()
-            ->route('staff-salaries.index', ['month' => $validated['payroll_month']])
-            ->with('status', "Payroll record created for {$staffMember->employee_code}.");
-    }
-
-    public function updatePayroll(UpdatePayrollRecordRequest $request, PayrollTransaction $payrollTransaction): RedirectResponse
-    {
-        if ($payrollTransaction->transaction_type !== 'wage') {
-            return redirect()
-                ->route('staff-salaries.index')
-                ->with('status', 'Only wage payroll records can be updated.');
-        }
-
-        $validated = $request->validated();
-        $status = $validated['status'];
-        $paymentDetails = $this->preparePayrollPaymentDetails($validated, $status === 'Paid');
-
-        $payrollTransaction->update([
-            'amount' => (float) $validated['salary_amount'],
-            'transaction_month' => Carbon::createFromFormat('Y-m', $validated['payroll_month'])->startOfMonth(),
-            'status' => $status,
-            ...$paymentDetails,
-            'notes' => $validated['notes'] ?? null,
-            'paid_at' => $status === 'Paid'
-                ? Carbon::parse($validated['payment_date'] ?? now())
-                : null,
-        ]);
-
-        ActivityLogger::log(
-            'payroll.record_updated',
-            "Payroll record {$payrollTransaction->id} updated.",
-            'payroll_transaction',
-            $payrollTransaction->id
-        );
-
-        return redirect()
-            ->route('staff-salaries.index', ['month' => Carbon::parse($payrollTransaction->transaction_month)->format('Y-m')])
-            ->with('status', 'Payroll record updated successfully.');
-    }
-
-    public function destroyPayroll(PayrollTransaction $payrollTransaction): RedirectResponse
-    {
-        if ($payrollTransaction->transaction_type !== 'wage') {
-            return redirect()
-                ->route('staff-salaries.index')
-                ->with('status', 'Only wage payroll records can be deleted.');
-        }
-
-        $id = $payrollTransaction->id;
-        $payrollTransaction->delete();
-
-        ActivityLogger::log(
-            'payroll.record_deleted',
-            "Payroll record {$id} deleted.",
-            'payroll_transaction'
-        );
-
-        return redirect()
-            ->route('staff-salaries.index')
-            ->with('status', 'Payroll record deleted successfully.');
-    }
-
-    public function payPayroll(PayPayrollRecordRequest $request, PayrollTransaction $payrollTransaction): RedirectResponse|JsonResponse
-    {
-        if ($payrollTransaction->transaction_type !== 'wage') {
-            return response()->json(['message' => 'Only wage payroll records can be paid.'], 422);
-        }
-
-        $validated = $request->validated();
-        $paymentDetails = $this->preparePayrollPaymentDetails($validated, true);
-        $paidAt = Carbon::parse($validated['payment_date'] ?? now());
-
-        $payrollTransaction->update([
-            'status' => 'Paid',
-            ...$paymentDetails,
-            'notes' => $validated['notes'] ?? $payrollTransaction->notes,
-            'paid_at' => $paidAt,
-        ]);
-        $payrollTransaction->load('staffMember');
-
-        ActivityLogger::log(
-            'payroll.wage_paid',
-            "Payroll record {$payrollTransaction->id} marked paid for {$payrollTransaction->staffMember?->name}.",
-            'payroll_transaction',
-            $payrollTransaction->id
-        );
-
-        if ($request->expectsJson() || $request->ajax()) {
-            return response()->json([
-                'message' => 'Payroll marked as paid.',
-                'record' => [
-                    'id' => $payrollTransaction->id,
-                    'employee_code' => $payrollTransaction->staffMember?->employee_code,
-                    'name' => $payrollTransaction->staffMember?->name,
-                    'month' => optional($payrollTransaction->transaction_month)->format('M Y'),
-                    'amount' => (float) $payrollTransaction->amount,
-                    'payment_method' => strtoupper((string) $payrollTransaction->payment_method),
-                    'paid_at' => optional($payrollTransaction->paid_at)->format('d M Y'),
-                ],
-            ]);
-        }
-
-        return redirect()
-            ->route('staff-salaries.index')
-            ->with('status', 'Payroll marked as paid.');
+            ->route('staff-salaries.index', ['month' => $request->input('month', now()->format('Y-m'))])
+            ->with('status', 'Worker deleted successfully.');
     }
 
     public function addAdvance(Request $request, StaffMember $staffMember): RedirectResponse
     {
         $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:1'],
             'month' => ['required', 'date_format:Y-m'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
+
+        $monthStart = $this->parseMonthStart($validated['month']);
+        $lockReason = $this->monthMutationLockReason($staffMember, $monthStart);
+        if ($lockReason !== null) {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $validated['month']])
+                ->with('status', $lockReason);
+        }
+
+        $advanceSoFar = (float) PayrollTransaction::query()
+            ->where('staff_member_id', $staffMember->id)
+            ->where('transaction_type', 'advance')
+            ->whereDate('transaction_month', $monthStart->toDateString())
+            ->sum('amount');
+
+        $salary = (float) $staffMember->monthly_wage;
+        if ($advanceSoFar + (float) $validated['amount'] > $salary + 0.009) {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $validated['month']])
+                ->with('status', 'Advance exceeds monthly salary limit.');
+        }
 
         PayrollTransaction::create([
             'staff_member_id' => $staffMember->id,
             'transaction_type' => 'advance',
             'status' => 'Paid',
             'amount' => $validated['amount'],
-            'transaction_month' => Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth(),
-            'payment_method' => 'bank',
+            'transaction_month' => $monthStart,
             'notes' => $validated['notes'] ?? null,
-            'paid_at' => now(),
+            'paid_at' => Carbon::parse($validated['date'])->endOfDay(),
         ]);
 
         ActivityLogger::log(
@@ -381,127 +264,219 @@ class StaffSalaryController extends Controller
 
         return redirect()
             ->route('staff-salaries.index', ['month' => $validated['month']])
-            ->with('status', "Advance recorded for {$staffMember->employee_code}.");
+            ->with('status', 'Advance added successfully.');
     }
 
     public function addExtraHours(Request $request, StaffMember $staffMember): RedirectResponse
     {
         $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:1'],
-            'hours' => ['nullable', 'numeric', 'min:0'],
             'month' => ['required', 'date_format:Y-m'],
+            'hours' => ['required', 'numeric', 'min:0.01'],
+            'rate' => ['nullable', 'numeric', 'min:0'],
+            'date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
+
+        $monthStart = $this->parseMonthStart($validated['month']);
+        $lockReason = $this->monthMutationLockReason($staffMember, $monthStart);
+        if ($lockReason !== null) {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $validated['month']])
+                ->with('status', $lockReason);
+        }
+
+        $rate = (float) ($validated['rate'] ?? $staffMember->overtime_rate ?? 0);
+        if ($rate <= 0) {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $validated['month']])
+                ->with('status', 'Overtime rate must be greater than zero.');
+        }
+
+        $hours = (float) $validated['hours'];
+        $amount = round($hours * $rate, 2);
 
         PayrollTransaction::create([
             'staff_member_id' => $staffMember->id,
             'transaction_type' => 'extra_hours',
             'status' => 'Paid',
-            'amount' => $validated['amount'],
-            'hours' => $validated['hours'] ?? null,
-            'transaction_month' => Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth(),
-            'payment_method' => 'bank',
+            'amount' => $amount,
+            'hours' => $hours,
+            'overtime_rate' => $rate,
+            'transaction_month' => $monthStart,
             'notes' => $validated['notes'] ?? null,
-            'paid_at' => now(),
+            'paid_at' => Carbon::parse($validated['date'])->endOfDay(),
         ]);
 
         ActivityLogger::log(
             'payroll.extra_hours',
-            "Extra hours payment of Rs ".number_format((float) $validated['amount'], 0)." added for {$staffMember->name}.",
+            "{$hours} overtime hour(s) added for {$staffMember->name}.",
             'staff_member',
             $staffMember->id
         );
 
         return redirect()
             ->route('staff-salaries.index', ['month' => $validated['month']])
-            ->with('status', "Extra hours recorded for {$staffMember->employee_code}.");
+            ->with('status', 'Overtime entry added successfully.');
     }
 
     public function payWage(Request $request, StaffMember $staffMember): RedirectResponse
     {
         $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:1'],
             'month' => ['required', 'date_format:Y-m'],
-            'payment_method' => ['required', 'in:bank,wallet'],
-            'wallet_type' => ['nullable', 'in:easypaisa,jazzcash'],
-            'bank_name' => ['nullable', 'string', 'max:120'],
-            'branch_code' => ['nullable', 'regex:/^\d{3,10}$/'],
-            'iban' => ['nullable', 'regex:/^PK[A-Z0-9]{22}$/'],
-            'account_number' => ['nullable', 'string', 'max:80'],
+            'absent_days' => ['required', 'numeric', 'min:0', 'max:30'],
+            'date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $paymentDetails = $this->preparePayrollPaymentDetails($validated, true);
+        $monthStart = $this->parseMonthStart($validated['month']);
+        $lockReason = $this->monthMutationLockReason($staffMember, $monthStart);
+        if ($lockReason !== null) {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $validated['month']])
+                ->with('status', $lockReason);
+        }
 
-        PayrollTransaction::create([
-            'staff_member_id' => $staffMember->id,
-            'transaction_type' => 'wage',
+        $baseSalary = round((float) $staffMember->monthly_wage, 2);
+        $advanceTotal = round((float) PayrollTransaction::query()
+            ->where('staff_member_id', $staffMember->id)
+            ->where('transaction_type', 'advance')
+            ->whereDate('transaction_month', $monthStart->toDateString())
+            ->sum('amount'), 2);
+        $overtimeTotal = round((float) PayrollTransaction::query()
+            ->where('staff_member_id', $staffMember->id)
+            ->where('transaction_type', 'extra_hours')
+            ->whereDate('transaction_month', $monthStart->toDateString())
+            ->sum('amount'), 2);
+
+        $absentDays = round((float) $validated['absent_days'], 2);
+        $dailySalary = round($baseSalary / 30, 4);
+        $absenceDeduction = round($absentDays * $dailySalary, 2);
+        $finalSalary = round($baseSalary + $overtimeTotal - $absenceDeduction - $advanceTotal, 2);
+
+        if ($finalSalary < -0.009) {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $validated['month']])
+                ->with('status', 'Final salary cannot be negative. Adjust advances/overtime/absent days.');
+        }
+        $finalSalary = max(0, $finalSalary);
+
+        $wageRecord = PayrollTransaction::query()
+            ->where('staff_member_id', $staffMember->id)
+            ->where('transaction_type', 'wage')
+            ->whereDate('transaction_month', $monthStart->toDateString())
+            ->first();
+
+        if ($wageRecord && $wageRecord->status === 'Paid') {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $validated['month']])
+                ->with('status', 'Salary already paid for this worker in this month.');
+        }
+
+        $payload = [
             'status' => 'Paid',
-            'amount' => (float) $validated['amount'],
-            'transaction_month' => Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth(),
-            ...$paymentDetails,
+            'amount' => $finalSalary,
+            'base_salary' => $baseSalary,
+            'total_advance' => $advanceTotal,
+            'total_overtime' => $overtimeTotal,
+            'absence_deduction' => $absenceDeduction,
+            'absent_days' => $absentDays,
+            'transaction_month' => $monthStart,
             'notes' => $validated['notes'] ?? null,
-            'paid_at' => now(),
-        ]);
+            'paid_at' => Carbon::parse($validated['date'])->endOfDay(),
+            'payment_method' => 'cash',
+        ];
+
+        if ($wageRecord) {
+            $wageRecord->update($payload);
+        } else {
+            PayrollTransaction::create([
+                'staff_member_id' => $staffMember->id,
+                'transaction_type' => 'wage',
+                ...$payload,
+            ]);
+        }
 
         ActivityLogger::log(
             'payroll.wage_paid',
-            "Wage payment of Rs ".number_format((float) $validated['amount'], 0)." paid to {$staffMember->name}.",
+            "Salary paid for {$staffMember->name} ({$validated['month']}).",
             'staff_member',
             $staffMember->id
         );
 
         return redirect()
             ->route('staff-salaries.index', ['month' => $validated['month']])
-            ->with('status', "Wage paid for {$staffMember->employee_code}.");
+            ->with('status', 'Salary paid successfully.');
     }
 
-    private function prepareStaffPaymentDetails(array $validated): array
+    public function undoPayment(Request $request, StaffMember $staffMember): RedirectResponse
     {
-        if ($validated['payment_method'] === 'bank') {
-            $validated['online_wallet_type'] = null;
-            $validated['online_wallet_number'] = null;
-        } else {
-            $validated['bank_name'] = null;
-            $validated['branch_code'] = null;
-            $validated['iban'] = null;
-            $validated['account_number'] = null;
+        $validated = $request->validate([
+            'month' => ['required', 'date_format:Y-m'],
+        ]);
+
+        $monthStart = $this->parseMonthStart($validated['month']);
+        $wageRecord = PayrollTransaction::query()
+            ->where('staff_member_id', $staffMember->id)
+            ->where('transaction_type', 'wage')
+            ->where('status', 'Paid')
+            ->whereDate('transaction_month', $monthStart->toDateString())
+            ->first();
+
+        if (! $wageRecord) {
+            return redirect()
+                ->route('staff-salaries.index', ['month' => $validated['month']])
+                ->with('status', 'No paid salary found for this worker in selected month.');
         }
 
-        return $validated;
+        $wageRecord->update([
+            'status' => 'Unpaid',
+            'paid_at' => null,
+        ]);
+
+        ActivityLogger::log(
+            'payroll.undo_payment',
+            "Salary payment undone for {$staffMember->name} ({$validated['month']}).",
+            'staff_member',
+            $staffMember->id
+        );
+
+        return redirect()
+            ->route('staff-salaries.index', ['month' => $validated['month']])
+            ->with('status', 'Salary payment undone. Month entries unlocked.');
     }
 
-    private function preparePayrollPaymentDetails(array $validated, bool $isPaid): array
+    private function parseMonthStart(string $month): Carbon
     {
-        if (! $isPaid) {
-            return [
-                'payment_method' => null,
-                'bank_name' => null,
-                'branch_code' => null,
-                'iban' => null,
-                'account_number' => null,
-            ];
+        try {
+            return Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+        } catch (\Throwable) {
+            return now()->startOfMonth();
+        }
+    }
+
+    private function monthMutationLockReason(StaffMember $staffMember, Carbon $monthStart): ?string
+    {
+        if (! $staffMember->is_active) {
+            return 'Only active workers are eligible for payroll operations.';
         }
 
-        if (($validated['payment_method'] ?? null) === 'wallet') {
-            $method = $validated['wallet_type'] ?? 'easypaisa';
+        $paidWageExists = PayrollTransaction::query()
+            ->where('staff_member_id', $staffMember->id)
+            ->where('transaction_type', 'wage')
+            ->where('status', 'Paid')
+            ->whereDate('transaction_month', $monthStart->toDateString())
+            ->exists();
 
-            return [
-                'payment_method' => $method,
-                'bank_name' => null,
-                'branch_code' => null,
-                'iban' => null,
-                'account_number' => $validated['account_number'] ?? null,
-            ];
+        if ($paidWageExists) {
+            return 'This month is locked because salary is already paid.';
         }
 
-        return [
-            'payment_method' => 'bank',
-            'bank_name' => $validated['bank_name'] ?? null,
-            'branch_code' => $validated['branch_code'] ?? null,
-            'iban' => $validated['iban'] ?? null,
-            'account_number' => $validated['account_number'] ?? null,
-        ];
+        return null;
+    }
+
+    private function normalizePakPhone(string $phone): string
+    {
+        return preg_replace('/\D+/', '', $phone) ?? $phone;
     }
 }
 

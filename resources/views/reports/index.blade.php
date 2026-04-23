@@ -5,7 +5,10 @@
 
 @section('header_actions')
     <div class="header-actions-slot">
-        <a href="#reportsFilter" class="action-chip primary" title="Filters" aria-label="Report filters">⚙️ <span class="header-action-text">Filters</span></a>
+        <a href="#reportsFilter" class="action-chip primary" title="Filters" aria-label="Report filters">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM19.4 15a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .27 1.7 1.7 0 0 0-.8 1.45V21a2 2 0 1 1-4 0v-.08a1.7 1.7 0 0 0-.8-1.45 1.7 1.7 0 0 0-1-.27 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.27-1 1.7 1.7 0 0 0-1.45-.8H2.8a2 2 0 1 1 0-4h.08a1.7 1.7 0 0 0 1.45-.8 1.7 1.7 0 0 0 .27-1 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.6c.36 0 .71-.1 1-.27a1.7 1.7 0 0 0 .8-1.45V2.8a2 2 0 1 1 4 0v.08a1.7 1.7 0 0 0 .8 1.45c.29.17.64.27 1 .27a1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.4 9c0 .36.1.71.27 1 .17.29.46.52.8.63H21.2a2 2 0 1 1 0 4h-.08a1.7 1.7 0 0 0-1.45.8c-.17.29-.27.64-.27 1Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="header-action-text">Filters</span>
+        </a>
     </div>
 @endsection
 
@@ -38,6 +41,37 @@
             font-size: 19px;
             color: #1f3f24;
             font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .title-icon {
+            width: 20px;
+            height: 20px;
+            color: #0f7a35;
+            flex: 0 0 auto;
+        }
+
+        .title-icon svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .title-icon-filter {
+            background: #ecf7ef;
+            border: 1px solid #d4ead4;
+            border-radius: 8px;
+            padding: 3px;
+            width: 24px;
+            height: 24px;
+        }
+
+        .panel-head .btn {
+            border-color: #cfe6d1;
+            color: #204326;
+            background: #f8fdf8;
         }
 
         .panel-body {
@@ -200,12 +234,29 @@
 @section('content')
     @php
         $printQuery = request()->only(['year', 'month', 'date_from', 'date_to']);
+        $reportIcon = static function (string $kind): string {
+            return match ($kind) {
+                'invoice' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3h7l5 5v13H7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 3v6h5M10 13h6M10 17h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+                'fees' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M6 8h10a3 3 0 0 0 0-6H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H8a3 3 0 1 0 0 6h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+                'admissions' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4 3 8l9 4 9-4-9-4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 10.5V14c0 1.7 2.2 3 5 3s5-1.3 5-3v-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+                'salaries' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M8 14h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+                'expenses' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 18h16M6 16l4-5 3 3 5-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+                'income' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 16l4-4 4 3 6-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 8h2v2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+                'profit-loss' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-3 3 2 4-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+                default => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/></svg>',
+            };
+        };
     @endphp
 
     <div class="reports-grid">
         <section class="panel" id="reportsFilter">
             <header class="panel-head">
-                <h3 class="panel-title">📅 Report Filters</h3>
+                <h3 class="panel-title">
+                    <span class="title-icon title-icon-filter" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16M7 12h10M10 19h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                    </span>
+                    Report Filters
+                </h3>
                 <div class="chips">
                     <span class="chip">Period: {{ $periodLabel }}</span>
                 </div>
@@ -239,8 +290,8 @@
                     <div class="field" style="justify-content:flex-end;">
                         <label>&nbsp;</label>
                         <div class="chips">
-                            <button class="btn primary" type="submit">📊 Apply</button>
-                            <a class="btn" href="{{ route('reports.index') }}">↺ Reset</a>
+                            <button class="btn primary" type="submit">Apply</button>
+                            <a class="btn" href="{{ route('reports.index') }}">Reset</a>
                         </div>
                     </div>
                 </form>
@@ -249,8 +300,13 @@
 
         <section class="panel">
             <header class="panel-head">
-                <h3 class="panel-title">{{ $reports['invoices']['icon'] }} {{ $reports['invoices']['title'] }}</h3>
-                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'invoices'], $printQuery)) }}">🖨️</a>
+                <h3 class="panel-title">
+                    <span class="title-icon" aria-hidden="true">{!! $reportIcon((string) $reports['invoices']['icon']) !!}</span>
+                    {{ $reports['invoices']['title'] }}
+                </h3>
+                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'invoices'], $printQuery)) }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8V4h10v4M7 17H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
             </header>
             <div class="panel-body">
                 <div class="stats">
@@ -273,8 +329,13 @@
 
         <section class="panel">
             <header class="panel-head">
-                <h3 class="panel-title">{{ $reports['fees']['icon'] }} {{ $reports['fees']['title'] }}</h3>
-                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'fees'], $printQuery)) }}">🖨️</a>
+                <h3 class="panel-title">
+                    <span class="title-icon" aria-hidden="true">{!! $reportIcon((string) $reports['fees']['icon']) !!}</span>
+                    {{ $reports['fees']['title'] }}
+                </h3>
+                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'fees'], $printQuery)) }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8V4h10v4M7 17H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
             </header>
             <div class="panel-body">
                 <div class="stats">
@@ -297,8 +358,13 @@
 
         <section class="panel">
             <header class="panel-head">
-                <h3 class="panel-title">{{ $reports['admissions']['icon'] }} {{ $reports['admissions']['title'] }}</h3>
-                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'admissions'], $printQuery)) }}">🖨️</a>
+                <h3 class="panel-title">
+                    <span class="title-icon" aria-hidden="true">{!! $reportIcon((string) $reports['admissions']['icon']) !!}</span>
+                    {{ $reports['admissions']['title'] }}
+                </h3>
+                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'admissions'], $printQuery)) }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8V4h10v4M7 17H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
             </header>
             <div class="panel-body">
                 <div class="stats">
@@ -321,8 +387,13 @@
 
         <section class="panel">
             <header class="panel-head">
-                <h3 class="panel-title">{{ $reports['salaries']['icon'] }} {{ $reports['salaries']['title'] }}</h3>
-                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'salaries'], $printQuery)) }}">🖨️</a>
+                <h3 class="panel-title">
+                    <span class="title-icon" aria-hidden="true">{!! $reportIcon((string) $reports['salaries']['icon']) !!}</span>
+                    {{ $reports['salaries']['title'] }}
+                </h3>
+                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'salaries'], $printQuery)) }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8V4h10v4M7 17H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
             </header>
             <div class="panel-body">
                 <div class="stats">
@@ -345,8 +416,13 @@
 
         <section class="panel">
             <header class="panel-head">
-                <h3 class="panel-title">{{ $reports['expenses']['icon'] }} {{ $reports['expenses']['title'] }}</h3>
-                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'expenses'], $printQuery)) }}">🖨️</a>
+                <h3 class="panel-title">
+                    <span class="title-icon" aria-hidden="true">{!! $reportIcon((string) $reports['expenses']['icon']) !!}</span>
+                    {{ $reports['expenses']['title'] }}
+                </h3>
+                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'expenses'], $printQuery)) }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8V4h10v4M7 17H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
             </header>
             <div class="panel-body">
                 <div class="stats">
@@ -369,8 +445,13 @@
 
         <section class="panel">
             <header class="panel-head">
-                <h3 class="panel-title">{{ $reports['income']['icon'] }} {{ $reports['income']['title'] }}</h3>
-                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'income'], $printQuery)) }}">🖨️</a>
+                <h3 class="panel-title">
+                    <span class="title-icon" aria-hidden="true">{!! $reportIcon((string) $reports['income']['icon']) !!}</span>
+                    {{ $reports['income']['title'] }}
+                </h3>
+                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'income'], $printQuery)) }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8V4h10v4M7 17H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
             </header>
             <div class="panel-body">
                 <table class="table">
@@ -387,8 +468,13 @@
 
         <section class="panel">
             <header class="panel-head">
-                <h3 class="panel-title">{{ $reports['profit-loss']['icon'] }} {{ $reports['profit-loss']['title'] }}</h3>
-                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'profit-loss'], $printQuery)) }}">🖨️</a>
+                <h3 class="panel-title">
+                    <span class="title-icon" aria-hidden="true">{!! $reportIcon((string) $reports['profit-loss']['icon']) !!}</span>
+                    {{ $reports['profit-loss']['title'] }}
+                </h3>
+                <a class="btn" target="_blank" href="{{ route('reports.print', array_merge(['report' => 'profit-loss'], $printQuery)) }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 8V4h10v4M7 17H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
             </header>
             <div class="panel-body">
                 <div class="stats">

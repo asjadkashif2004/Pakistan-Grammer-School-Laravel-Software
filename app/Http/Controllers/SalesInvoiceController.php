@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\SalesInvoice;
+use App\Models\Student;
 use App\Support\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -16,42 +17,41 @@ class SalesInvoiceController extends Controller
 {
     public function index(Request $request): View
     {
-        $products = Product::orderBy('name')->get();
-        $invoices = SalesInvoice::with('items.product')
+        $invoices = SalesInvoice::with(['items.product', 'student'])
             ->latest('invoice_date')
             ->paginate(10)
             ->withQueryString();
 
         return view('invoices.index', [
             'todayLabel' => now()->format('l, d F Y'),
-            'products' => $products,
             'invoices' => $invoices,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $request->merge([
-            'customer_contact' => $this->normalizePhone($request->input('customer_contact')),
-        ]);
-
         $validated = $request->validate([
-            'customer_name' => ['required', 'string', 'max:180'],
-            'customer_contact' => ['nullable', 'regex:/^03\d{2}-\d{7}$/'],
+            'student_id' => ['required', 'exists:students,id'],
             'invoice_date' => ['required', 'date'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:1200'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
+        ], [
+            'student_id.required' => 'Please look up a valid student by Student ID.',
+            'student_id.exists' => 'The selected student is invalid.',
         ]);
 
-        $invoice = DB::transaction(function () use ($validated) {
+        $student = Student::findOrFail($validated['student_id']);
+
+        $invoice = DB::transaction(function () use ($validated, $student) {
             $subtotal = 0;
             $invoice = SalesInvoice::create([
                 'invoice_number' => null,
-                'customer_name' => $validated['customer_name'],
-                'customer_contact' => $validated['customer_contact'] ?? null,
+                'student_id' => $student->id,
+                'customer_name' => $student->full_name,
+                'customer_contact' => null,
                 'invoice_date' => $validated['invoice_date'],
                 'subtotal' => 0,
                 'discount' => (float) ($validated['discount'] ?? 0),
@@ -95,7 +95,7 @@ class SalesInvoiceController extends Controller
         });
         ActivityLogger::log(
             'invoice.created',
-            "Invoice {$invoice->invoice_number} created for {$invoice->customer_name}.",
+            "Invoice {$invoice->invoice_number} created for student {$student->student_code} ({$student->full_name}).",
             'sales_invoice',
             $invoice->id
         );
@@ -107,7 +107,7 @@ class SalesInvoiceController extends Controller
 
     public function print(SalesInvoice $invoice): View
     {
-        $invoice->load('items.product');
+        $invoice->load(['items.product', 'student']);
 
         return view('invoices.print', [
             'invoice' => $invoice,
@@ -117,7 +117,7 @@ class SalesInvoiceController extends Controller
 
     public function download(SalesInvoice $invoice)
     {
-        $invoice->load('items.product');
+        $invoice->load(['items.product', 'student']);
 
         $html = view('invoices.print', [
             'invoice' => $invoice,
@@ -163,17 +163,33 @@ class SalesInvoiceController extends Controller
         ]);
     }
 
-    private function normalizePhone(?string $value): ?string
+    public function studentLookup(Request $request): JsonResponse
     {
-        if ($value === null || trim($value) === '') {
-            return null;
+        $request->validate([
+            'student_code' => ['required', 'string', 'max:40'],
+        ]);
+
+        $code = strtoupper(trim((string) $request->query('student_code', '')));
+        $student = Student::query()
+            ->whereRaw('UPPER(student_code) = ?', [$code])
+            ->first();
+
+        if (! $student) {
+            return response()->json([
+                'found' => false,
+                'message' => 'Student not found. Enter Student ID (e.g. PGS-00025).',
+            ], 404);
         }
 
-        $digits = substr(preg_replace('/\D+/', '', $value) ?? '', 0, 11);
-        if (strlen($digits) !== 11 || !str_starts_with($digits, '03')) {
-            return trim($value);
-        }
-
-        return sprintf('%s-%s', substr($digits, 0, 4), substr($digits, 4, 7));
+        return response()->json([
+            'found' => true,
+            'id' => $student->id,
+            'student_code' => $student->student_code,
+            'full_name' => $student->full_name,
+            'class_name' => $student->class_name,
+            'section' => $student->section,
+            'father_name' => $student->father_name,
+            'contact_number' => $student->contact_number,
+        ]);
     }
 }

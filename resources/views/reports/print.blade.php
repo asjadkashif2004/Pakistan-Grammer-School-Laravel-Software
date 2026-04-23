@@ -283,4 +283,11 @@
         @endif
     </section>
 </body>
+@if (request()->boolean('auto_print'))
+<script>
+window.addEventListener('load', function () {
+    window.print();
+});
+</script>
+@endif
 </html>

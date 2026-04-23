@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Models\SalesInvoice;
 use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ class ExpenseController extends Controller
         $month = $request->query('month', now()->format('Y-m'));
         $monthStart = now()->createFromFormat('Y-m', $month)->startOfMonth();
         $monthEnd = $monthStart->copy()->endOfMonth();
+        $today = now()->toDateString();
 
         $expenses = Expense::query()
             ->whereBetween('expense_date', [$monthStart, $monthEnd])
@@ -28,10 +30,34 @@ class ExpenseController extends Controller
             ->groupBy('category')
             ->pluck('total', 'category');
 
+        $todayInvoicesQuery = SalesInvoice::query()->whereDate('invoice_date', $today);
+        $todayExpensesQuery = Expense::query()->whereDate('expense_date', $today);
+
+        $todayInvoices = (clone $todayInvoicesQuery)
+            ->with('student:id,first_name,last_name')
+            ->latest('created_at')
+            ->limit(6)
+            ->get();
+
+        $todayExpenses = (clone $todayExpensesQuery)
+            ->latest('created_at')
+            ->limit(6)
+            ->get();
+
+        $todayEarnings = (float) (clone $todayInvoicesQuery)->sum('total_amount');
+        $todayExpensesTotal = (float) (clone $todayExpensesQuery)->sum('amount');
+
         return view('expenses.index', [
             'todayLabel' => now()->format('l, d F Y'),
             'month' => $month,
             'expenses' => $expenses,
+            'todayInvoices' => $todayInvoices,
+            'todayExpenses' => $todayExpenses,
+            'todayEarnings' => $todayEarnings,
+            'todayExpensesTotal' => $todayExpensesTotal,
+            'todayInvoicesCount' => (int) (clone $todayInvoicesQuery)->count(),
+            'todayExpensesCount' => (int) (clone $todayExpensesQuery)->count(),
+            'netBalance' => $todayEarnings - $todayExpensesTotal,
             'summaryTotal' => (float) $summary->sum(),
             'summaryUtilities' => (float) ($summary['Utilities'] ?? 0),
             'summaryMaintenance' => (float) ($summary['Maintenance'] ?? 0),
